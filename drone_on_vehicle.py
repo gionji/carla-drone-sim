@@ -55,7 +55,7 @@ drone_initial_transform = carla.Transform(
         z=vehicle_location.z + 10  # 10 meters above the vehicle
     )
 )
-vehicle.set_autopilot(True)
+vehicle.set_autopilot(False)
 
 # Filter and print all static props
 print("Static Props:")
@@ -151,6 +151,7 @@ def process_image(data):
 drone_camera.listen(process_image)
 
 drone_autopilot = False
+vehicle_autopilot = False
 
 try:
     # Main loop
@@ -170,6 +171,11 @@ try:
         
         elif keys[pygame.K_x]:
             drone_autopilot = not drone_autopilot  
+            time.sleep(0.1) 
+        
+        elif keys[pygame.K_z]:
+            vehicle_autopilot = not vehicle_autopilot
+            vehicle.set_autopilot( vehicle_autopilot )  
             time.sleep(0.1)         
         
         else:
@@ -178,6 +184,24 @@ try:
             
             else:
                 move_drone_to_vehicle()
+
+        # Vehicle control
+        if not vehicle_autopilot:
+            throttle = 0.0
+            brake = 0.0
+            steer = 0.0
+
+            if keys[pygame.K_UP]:
+                throttle = 1.0
+            if keys[pygame.K_DOWN]:
+                brake = 1.0
+            if keys[pygame.K_LEFT]:
+                steer = -1.0
+            if keys[pygame.K_RIGHT]:
+                steer = 1.0
+
+            control = carla.VehicleControl(throttle=throttle, brake=brake, steer=steer)
+            vehicle.apply_control(control)
 
 
         if image is not None:

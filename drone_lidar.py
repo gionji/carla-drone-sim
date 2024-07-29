@@ -56,6 +56,19 @@ drone_camera_relative_transform = carla.Transform( far_camera_position )
 drone_camera = world.try_spawn_actor(drone_camera_bp_rgb, drone_camera_relative_transform, attach_to=drone)
 
 
+# Create and configure the LIDAR sensor
+lidar_bp = blueprint_library.find('sensor.lidar.ray_cast')
+lidar_bp.set_attribute('upper_fov', '15')
+lidar_bp.set_attribute('lower_fov', '-30')
+lidar_bp.set_attribute('rotation_frequency', '10')
+lidar_bp.set_attribute('points_per_second', '50000')
+lidar_bp.set_attribute('range', '100')
+
+# Attach the LIDAR to the drone
+lidar_position = carla.Location(x=0, y=0, z=0.2)
+lidar_transform = carla.Transform(lidar_position)
+lidar = world.try_spawn_actor(lidar_bp, lidar_transform, attach_to=drone)
+
 # Trashbin control variables
 drone_speed = 30
 drone_rotation_speed = 30
@@ -113,6 +126,37 @@ drone_camera.listen(process_image)
 
 
 
+# LIDAR data processing callback
+def process_lidar_data(data):
+    points = np.frombuffer(data.raw_data, dtype=np.float32).reshape(-1, 4)
+    # Project points to 2D
+    if points.size > 0:
+        x = points[:, 0]
+        y = points[:, 1]
+        z = points[:, 2]
+        intensity = points[:, 3]
+        
+        # Normalize intensity for visualization
+        intensity = np.clip(intensity, 0, 1) * 255
+        intensity = intensity.astype(np.uint8)
+
+        # Create a blank image and draw points
+        image = np.zeros((display_height, display_width, 3), dtype=np.uint8)
+        for (px, py, pz, inten) in zip(x, y, z, intensity):
+            if px > 0 and px < display_width and py > 0 and py < display_height:
+                color = (inten, inten, inten)
+                image[int(py), int(px)] = color
+        
+        # Display the image
+        surface = pygame.surfarray.make_surface(image.swapaxes(0, 1))
+        display.blit(surface, (0, 0))
+
+# Attach the callback to the LIDAR sensor
+lidar.listen(process_lidar_data)
+
+
+
+
 try:
     # Main loop
     
@@ -150,5 +194,9 @@ finally:
     # Clean up
     drone_camera.stop()
     drone_camera.destroy()
+
+    lidar.stop()
+    lidar.destroy()
+
     drone.destroy()
     pygame.quit()
